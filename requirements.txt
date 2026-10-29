@@ -1,0 +1,7 @@
+pandas>=2.0
+requests>=2.31
+yfinance>=0.2.50
+finance-datareader>=0.9.90
+lxml
+cryptography>=42
+pywebpush>=2.0
