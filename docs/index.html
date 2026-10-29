@@ -1,0 +1,687 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>주식 레이더</title>
+<meta name="theme-color" content="#0f172a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="주식 레이더">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+:root{
+  --bg:#f3f4f7;--card:#fff;--fg:#14161a;--mut:#6b7280;--line:#e5e7eb;--soft:#f6f7f9;
+  --acc:#2563eb;--accb:#e8efff;--up:#e5383b;--dn:#1d6ff2;
+  --ok:#15803d;--okb:#e7f6ec;--warn:#b45309;--warnb:#fff4e0;--bad:#c62828;--badb:#fdeaea;--info:#334155;--infob:#eef2f7;
+  --star:#e8a200;--starb:#fff7e0;--shadow:0 1px 2px rgba(0,0,0,.05),0 2px 10px rgba(0,0,0,.04);
+  --top:env(safe-area-inset-top);--bot:env(safe-area-inset-bottom);
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0b0d12;--card:#151821;--fg:#eef0f4;--mut:#9aa3b2;--line:#262b36;--soft:#1b1f2a;
+  --acc:#6b9bff;--accb:#1a2540;--up:#ff6b6e;--dn:#5b9dff;
+  --ok:#4ade80;--okb:#13281b;--warn:#fbbf24;--warnb:#2b2210;--bad:#ff7070;--badb:#2e1416;--info:#cbd5e1;--infob:#1c2230;
+  --star:#fbbf24;--starb:#2a2210;--shadow:none}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--fg);font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif;font-size:15px;line-height:1.45}
+button,input,select,textarea{font:inherit;color:inherit}
+a{color:var(--acc);text-decoration:none}
+.hidden{display:none!important}
+header{position:sticky;top:0;z-index:20;background:var(--bg);padding:calc(var(--top) + 10px) 16px 8px;display:flex;align-items:center;gap:10px}
+header h1{font-size:20px;margin:0;flex:1;letter-spacing:-.3px}
+header .sub{font-size:12px;color:var(--mut);font-weight:500;display:block;letter-spacing:0}
+.iconbtn{width:38px;height:38px;border-radius:12px;border:1px solid var(--line);background:var(--card);display:grid;place-items:center;cursor:pointer}
+.iconbtn svg{width:19px;height:19px}
+.spin svg{animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
+main{padding:4px 16px calc(84px + var(--bot));max-width:760px;margin:0 auto}
+nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--card);border-top:1px solid var(--line);display:flex;padding:6px 6px calc(6px + var(--bot))}
+nav.tabs button{flex:1;border:0;background:none;padding:6px 0 4px;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11px;color:var(--mut);cursor:pointer}
+nav.tabs button svg{width:23px;height:23px}
+nav.tabs button.on{color:var(--acc);font-weight:700}
+.card{background:var(--card);border-radius:16px;padding:14px 16px;margin:10px 0;box-shadow:var(--shadow);border:1px solid var(--line)}
+.sec{font-size:13px;font-weight:700;color:var(--mut);margin:18px 2px 6px;display:flex;justify-content:space-between;align-items:center}
+.row{display:flex;align-items:center;gap:10px}
+.grow{flex:1;min-width:0}
+.name{font-weight:700;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tick{font-size:12px;color:var(--mut)}
+.num{font-variant-numeric:tabular-nums}
+.big{font-size:22px;font-weight:800;letter-spacing:-.3px}
+.up{color:var(--up)}.dn{color:var(--dn)}
+.badge{display:inline-block;font-size:12px;font-weight:700;border-radius:8px;padding:3px 8px;white-space:nowrap}
+.b-sell{background:var(--badb);color:var(--bad)}.b-warn{background:var(--warnb);color:var(--warn)}
+.b-take{background:var(--okb);color:var(--ok)}.b-hold{background:var(--infob);color:var(--info)}
+.b-star{background:var(--starb);color:var(--star)}.b-wait{background:var(--soft);color:var(--mut)}
+.chip{display:inline-block;font-size:11.5px;border-radius:6px;padding:2px 6px;background:var(--soft);color:var(--mut);margin-right:4px}
+.chip.high{background:var(--badb);color:var(--bad)}.chip.mid{background:var(--warnb);color:var(--warn)}.chip.low{background:var(--okb);color:var(--ok)}
+.list .item{display:flex;align-items:center;gap:12px;padding:12px 2px;border-bottom:1px solid var(--line);cursor:pointer}
+.list .item:last-child{border-bottom:0}
+.right{text-align:right}
+.muted{color:var(--mut);font-size:13px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stat{background:var(--soft);border-radius:12px;padding:10px}
+.stat b{display:block;font-size:18px}.stat span{font-size:12px;color:var(--mut)}
+.alert{border-left:4px solid var(--bad)}
+.alert.warn{border-left-color:var(--warn)}
+.seg{display:flex;background:var(--soft);border-radius:12px;padding:3px;margin:8px 0}
+.seg button{flex:1;border:0;background:none;padding:8px;border-radius:9px;font-weight:600;color:var(--mut);cursor:pointer}
+.seg button.on{background:var(--card);color:var(--fg);box-shadow:var(--shadow)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:0;border-radius:12px;padding:12px 16px;font-weight:700;cursor:pointer;background:var(--acc);color:#fff}
+.btn.full{width:100%}.btn.ghost{background:var(--soft);color:var(--fg)}.btn.danger{background:var(--badb);color:var(--bad)}
+.btn:disabled{opacity:.5}
+.fab{position:fixed;right:18px;bottom:calc(84px + var(--bot));z-index:25;border-radius:28px;padding:14px 20px;box-shadow:0 6px 20px rgba(37,99,235,.35)}
+label.f{display:block;margin:10px 0}
+label.f span{display:block;font-size:13px;color:var(--mut);margin-bottom:4px;font-weight:600}
+input.in,textarea.in,select.in{width:100%;border:1px solid var(--line);background:var(--soft);border-radius:12px;padding:12px;outline:none}
+input.in:focus,textarea.in:focus{border-color:var(--acc)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:50;display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--bg);width:100%;max-width:760px;max-height:92vh;overflow:auto;border-radius:20px 20px 0 0;padding:8px 16px calc(20px + var(--bot))}
+.sheet .grab{width:40px;height:5px;border-radius:3px;background:var(--line);margin:4px auto 8px}
+.sheet h2{font-size:19px;margin:6px 0 4px}
+.lock{min-height:100vh;display:flex;flex-direction:column;justify-content:center;padding:24px;max-width:420px;margin:0 auto}
+.lock img{width:72px;height:72px;border-radius:18px;margin-bottom:14px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(150px + var(--bot));background:#111827;color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;z-index:80;max-width:90vw;text-align:center}
+iframe.rep{width:100%;border:0;display:block;background:#fff;border-radius:14px;min-height:200px}
+.levels{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.levels div{background:var(--soft);border-radius:10px;padding:8px 10px}
+.levels span{display:block;font-size:12px;color:var(--mut)}.levels b{font-size:15px}
+ul.reasons{margin:8px 0 2px;padding-left:18px}ul.reasons li{margin:3px 0;font-size:14px}
+.empty{text-align:center;color:var(--mut);padding:26px 10px}
+.kv{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line);font-size:14px}.kv:last-child{border:0}
+.steps{padding-left:20px;margin:6px 0}.steps li{margin:4px 0;font-size:14px}
+code{background:var(--soft);padding:1px 5px;border-radius:5px;font-size:13px}
+#qr img,#qr canvas{margin:10px auto;display:block;background:#fff;padding:10px;border-radius:12px}
+</style>
+</head>
+<body>
+
+<!-- 잠금 화면 -->
+<div id="lock" class="lock hidden">
+  <img src="icon-192.png" alt="">
+  <h1 style="margin:0 0 6px;font-size:24px">주식 레이더</h1>
+  <p class="muted" style="margin:0 0 18px">거래량 급증·주가 정체 종목과 내 보유 종목을 매일 분석합니다.</p>
+  <label class="f"><span>앱 비밀번호</span><input id="pw" class="in" type="password" autocomplete="current-password" placeholder="GitHub에 등록한 APP_PASSWORD"></label>
+  <label class="row muted" style="gap:8px;margin:4px 0 14px"><input id="remember" type="checkbox" checked> 이 기기에서 기억하기</label>
+  <button class="btn full" id="unlockBtn">열기</button>
+  <p id="lockMsg" class="muted" style="margin-top:12px"></p>
+</div>
+
+<div id="app" class="hidden">
+  <header>
+    <h1><span id="title">홈</span><span class="sub" id="updated">불러오는 중…</span></h1>
+    <button class="iconbtn" id="refreshBtn" aria-label="새로고침"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v5h-5"/></svg></button>
+  </header>
+  <main id="view"></main>
+  <button class="btn fab hidden" id="fab">＋ 매수 추가</button>
+  <nav class="tabs">
+    <button data-tab="home" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>홈</button>
+    <button data-tab="picks"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 19V5M4 19h16"/><path d="M8 15l3-4 3 2 5-6"/></svg>추천</button>
+    <button data-tab="hold"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="6" width="18" height="14" rx="2"/><path d="M8 6V4h8v2M3 12h18"/></svg>보유</button>
+    <button data-tab="report"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h7M9 17h7"/></svg>리포트</button>
+    <button data-tab="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>설정</button>
+  </nav>
+</div>
+
+<script>
+"use strict";
+/* ───────────── 저장소 / 설정 ───────────── */
+const LS = {
+  get(k, d = null) { try { const v = localStorage.getItem("sr_" + k); return v === null ? d : v; } catch { return d; } },
+  set(k, v) { try { v === null ? localStorage.removeItem("sr_" + k) : localStorage.setItem("sr_" + k, v); } catch {} },
+};
+function repoInfo() {
+  const o = LS.get("owner"), r = LS.get("repo");
+  if (o && r) return { owner: o, repo: r };
+  const h = location.hostname;
+  if (h.endsWith(".github.io")) return { owner: h.split(".")[0], repo: location.pathname.split("/").filter(Boolean)[0] || "" };
+  return { owner: "", repo: "" };
+}
+// QR로 넘어온 설정 (#setup=...)
+(function importSetupFromHash() {
+  const m = location.hash.match(/setup=([^&]+)/);
+  if (!m) return;
+  try {
+    const s = JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(m[1])))));
+    if (s.token) LS.set("token", s.token);
+    if (s.owner) LS.set("owner", s.owner);
+    if (s.repo) LS.set("repo", s.repo);
+    window.__setupImported = true;
+  } catch {}
+  history.replaceState(null, "", location.pathname + location.search);
+})();
+
+/* ───────────── 암호화 (서버와 같은 방식: PBKDF2-SHA256 → AES-256-GCM) ───────────── */
+const enc = new TextEncoder(), dec = new TextDecoder();
+const b64d = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+const b64e = u => { let s = ""; u = new Uint8Array(u); for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); };
+const keyCache = new Map();
+async function deriveKey(pw, salt, iter) {
+  const id = pw + "|" + b64e(salt) + "|" + iter;
+  if (keyCache.has(id)) return keyCache.get(id);
+  const base = await crypto.subtle.importKey("raw", enc.encode(pw), "PBKDF2", false, ["deriveKey"]);
+  const k = await crypto.subtle.deriveKey({ name: "PBKDF2", hash: "SHA-256", salt, iterations: iter }, base,
+    { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+  keyCache.set(id, k); return k;
+}
+async function decryptText(text, pw) {
+  const d = JSON.parse(text);
+  const k = await deriveKey(pw, b64d(d.salt), d.iter || 210000);
+  const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: b64d(d.iv) }, k, b64d(d.ct));
+  return JSON.parse(dec.decode(plain));
+}
+async function encryptObj(obj, pw) {
+  const salt = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12));
+  const k = await deriveKey(pw, salt, 210000);
+  const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, k, enc.encode(JSON.stringify(obj)));
+  return JSON.stringify({ v: 1, iter: 210000, salt: b64e(salt), iv: b64e(iv), ct: b64e(ct) });
+}
+
+/* ───────────── GitHub ───────────── */
+function gh(path, opt = {}) {
+  const { owner, repo } = repoInfo(), token = LS.get("token");
+  const headers = Object.assign({ "Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" }, opt.headers || {});
+  if (token) headers.Authorization = "Bearer " + token;
+  return fetch(`https://api.github.com/repos/${owner}/${repo}${path}`, Object.assign({}, opt, { headers, cache: "no-store" }));
+}
+async function fetchRepoFile(path, asText = true) {
+  // 토큰이 있으면 API(즉시 최신), 없으면 공개 주소
+  if (LS.get("token") && repoInfo().owner) {
+    const r = await gh(`/contents/${path}?t=${Date.now()}`, { headers: { Accept: "application/vnd.github.raw" } });
+    if (r.status === 404) return null;
+    if (!r.ok) throw new Error("GitHub " + r.status);
+    return asText ? r.text() : r;
+  }
+  const local = path.startsWith("docs/") ? path.slice(5) : null;
+  const { owner, repo } = repoInfo();
+  const url = local ? `${local}?t=${Date.now()}` : `https://raw.githubusercontent.com/${owner}/${repo}/main/${path}?t=${Date.now()}`;
+  const r = await fetch(url, { cache: "no-store" });
+  if (r.status === 404) return null;
+  if (!r.ok) throw new Error("파일을 받을 수 없음 " + r.status);
+  return r.text();
+}
+async function putRepoFile(path, text, message) {
+  let sha;
+  const g = await gh(`/contents/${path}`);
+  if (g.ok) sha = (await g.json()).sha;
+  else if (g.status !== 404) throw new Error(g.status === 401 ? "토큰이 잘못됐거나 만료됐습니다" : "GitHub 오류 " + g.status);
+  const r = await gh(`/contents/${path}`, { method: "PUT", body: JSON.stringify({ message, content: btoa(text), sha }) });
+  if (!r.ok) throw new Error(r.status === 403 || r.status === 404 ? "토큰 권한 부족 (Contents: Read and write 필요)" : "저장 실패 " + r.status);
+}
+async function dispatch(mode = "full") {
+  const r = await gh(`/actions/workflows/app.yml/dispatches`, { method: "POST", body: JSON.stringify({ ref: "main", inputs: { mode } }) });
+  if (!r.ok) throw new Error(r.status === 403 || r.status === 404 ? "토큰 권한 부족 (Actions: Read and write 필요)" : "실행 요청 실패 " + r.status);
+}
+async function latestRun() {
+  const r = await gh(`/actions/workflows/app.yml/runs?per_page=1`);
+  if (!r.ok) return null;
+  return (await r.json()).workflow_runs?.[0] || null;
+}
+
+/* ───────────── 상태 ───────────── */
+const S = { pw: null, data: null, trades: null, tradesLoaded: false, tab: "home", region: "KR", running: false };
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const isKR = h => (h.region || "").toUpperCase() === "KR" || /\.(KS|KQ)$/.test(h.ticker || "") || /^[0-9][0-9A-Z]{5}$/.test(h.code || "");
+const money = (v, kr) => v == null || isNaN(v) ? "-" : kr ? Math.round(v).toLocaleString("ko-KR") + "원" : "$" + Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const pct = v => v == null || isNaN(v) ? "-" : (v > 0 ? "+" : "") + Number(v).toFixed(2) + "%";
+const cls = v => v > 0 ? "up" : v < 0 ? "dn" : "";
+const STATUS_BADGE = { sell: "b-sell", warn: "b-warn", take: "b-take", hold: "b-hold" };
+const STATUS_ICON = { sell: "🔴", warn: "🟠", take: "🟢", hold: "🔵" };
+const DUMP_TXT = { high: "높음", mid: "중간", low: "낮음" };
+function toast(msg, ms = 2600) { const t = document.createElement("div"); t.className = "toast"; t.textContent = msg; document.body.appendChild(t); setTimeout(() => t.remove(), ms); }
+function fmtTime(iso) { if (!iso) return "-"; const d = new Date(iso); return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; }
+function uid() { return Math.random().toString(36).slice(2, 10); }
+function today() { const d = new Date(); return new Date(d - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10); }
+
+/* ───────────── 시작 / 잠금 ───────────── */
+async function loadData(showErr = true) {
+  const text = await fetchRepoFile("docs/data.enc");
+  if (!text) throw new Error("아직 분석 데이터가 없습니다. 첫 분석이 끝날 때까지 기다리거나 설정에서 '지금 분석'을 누르세요.");
+  const data = await decryptText(text, S.pw);
+  S.data = data; LS.set("cache", text);
+  return data;
+}
+async function loadTrades() {
+  if (!LS.get("token")) { S.tradesLoaded = false; return; }
+  try {
+    const t = await fetchRepoFile("trades.enc");
+    S.trades = t ? (await decryptText(t, S.pw)).trades || [] : [];
+    S.tradesLoaded = true;
+  } catch (e) { S.tradesLoaded = false; console.warn(e); }
+}
+async function unlock(pw, remember) {
+  $("#lockMsg").textContent = "여는 중…";
+  S.pw = pw;
+  try {
+    const cached = LS.get("cache");
+    if (cached) { try { S.data = await decryptText(cached, pw); } catch { S.data = null; } }
+    if (!S.data) await loadData();
+    if (remember) LS.set("pw", pw); else LS.set("pw", null);
+    $("#lock").classList.add("hidden"); $("#app").classList.remove("hidden");
+    render();
+    refresh(true);
+  } catch (e) {
+    S.pw = null;
+    $("#lockMsg").textContent = e.name === "OperationError" ? "비밀번호가 맞지 않습니다." : e.message;
+    $("#lock").classList.remove("hidden");
+  }
+}
+async function refresh(silent = false) {
+  const btn = $("#refreshBtn"); btn.classList.add("spin");
+  try {
+    await Promise.all([loadData(), loadTrades()]);
+    render(); if (!silent) toast("최신 데이터를 불러왔습니다");
+  } catch (e) { if (!silent) toast(e.message); }
+  finally { btn.classList.remove("spin"); }
+  checkRun();
+}
+
+/* ───────────── 화면 ───────────── */
+const TITLES = { home: "홈", picks: "추천 종목", hold: "내 보유 종목", report: "리포트", settings: "설정" };
+function render() {
+  const d = S.data;
+  $("#title").textContent = TITLES[S.tab];
+  $("#updated").textContent = d ? `분석 ${fmtTime(d.screened_at || d.generated_at)} · 보유 점검 ${fmtTime(d.generated_at)}` + (S.running ? " · 분석 실행 중…" : "") : "";
+  document.querySelectorAll("nav.tabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === S.tab));
+  $("#fab").classList.toggle("hidden", S.tab !== "hold");
+  const v = $("#view");
+  v.innerHTML = ({ home: viewHome, picks: viewPicks, hold: viewHold, report: viewReport, settings: viewSettings }[S.tab])();
+  if (S.tab === "report") mountReport();
+  if (S.tab === "settings") bindSettings();
+  v.querySelectorAll("[data-pick]").forEach(el => el.onclick = () => openPick(el.dataset.pick));
+  v.querySelectorAll("[data-hold]").forEach(el => el.onclick = () => openHolding(el.dataset.hold));
+  v.querySelectorAll("[data-goto]").forEach(el => el.onclick = () => { S.tab = el.dataset.goto; render(); scrollTo(0, 0); });
+}
+
+function holdingsMerged() {
+  const d = S.data || {}, list = (d.holdings || []).map(h => Object.assign({}, h));
+  if (S.tradesLoaded) {
+    const ids = new Set(S.trades.map(t => t.id));
+    const open = S.trades.filter(t => !t.sell_date);
+    const analyzed = new Set(list.map(h => h.id));
+    const out = list.filter(h => !h.id || (ids.has(h.id) && open.some(t => t.id === h.id)));
+    open.filter(t => !analyzed.has(t.id)).forEach(t => out.push({ id: t.id, name: t.name || t.code, ticker: t.code, pending: true,
+      buy_date: t.buy_date, buy_price: +t.buy_price, qty: t.qty, region: /^[0-9][0-9A-Z]{5}$/.test(t.code) ? "KR" : "US" }));
+    return out;
+  }
+  return list;
+}
+
+function viewHome() {
+  const d = S.data || {}, picks = d.picks || [];
+  const stars = picks.filter(p => p.star), hits = r => picks.filter(p => p.kind === "hit" && p.region === r).length;
+  const hold = holdingsMerged().filter(h => h.ok || h.pending);
+  const alerts = hold.filter(h => h.status === "sell" || h.status === "warn");
+  const pnlKR = hold.filter(h => isKR(h) && h.pnl != null).reduce((a, h) => a + h.pnl, 0);
+  const pnlUS = hold.filter(h => !isKR(h) && h.pnl != null).reduce((a, h) => a + h.pnl, 0);
+  let html = "";
+  if (alerts.length) {
+    html += `<div class="sec">⚠️ 확인이 필요한 보유 종목</div>`;
+    html += alerts.map(h => `<div class="card alert ${h.status === "warn" ? "warn" : ""}" data-hold="${esc(h.id || h.ticker)}">
+      <div class="row"><div class="grow"><div class="name">${esc(h.name)}</div><div class="tick">${esc(h.ticker)}</div></div>
+      <div class="right"><div class="big num ${cls(h.ret)}">${pct(h.ret)}</div><span class="badge ${STATUS_BADGE[h.status]}">${STATUS_ICON[h.status]} ${esc(h.label)}</span></div></div>
+      <div class="muted" style="margin-top:6px">${esc((h.reasons || [])[0] || "")}</div></div>`).join("");
+  }
+  html += `<div class="sec">★ 오늘의 관심 후보 <a data-goto="picks">전체 보기 ›</a></div>`;
+  html += stars.length ? `<div class="card list">${stars.map(pickRow).join("")}</div>`
+    : `<div class="card"><b>오늘은 ★ 관심 후보가 없습니다</b><div class="muted" style="margin-top:4px">5가지 조건을 모두 만족한 종목이 없어요. 무리해서 사지 않는 것도 전략입니다.</div></div>`;
+  html += `<div class="sec">오늘의 스크리닝</div><div class="card"><div class="stats">
+    <div class="stat"><b>${hits("KR")}</b><span>🇰🇷 조건 충족</span></div>
+    <div class="stat"><b>${hits("US")}</b><span>🇺🇸 조건 충족</span></div>
+    <div class="stat"><b>${stars.length}</b><span>★ 관심 후보</span></div></div>
+    <div class="muted" style="margin-top:10px">${esc(d.cond || "")}</div></div>`;
+  html += `<div class="sec">내 보유 종목 <a data-goto="hold">관리 ›</a></div><div class="card">
+    <div class="stats"><div class="stat"><b>${hold.length}</b><span>보유 종목</span></div>
+    <div class="stat"><b class="num ${cls(pnlKR)}">${pnlKR ? (pnlKR > 0 ? "+" : "") + Math.round(pnlKR).toLocaleString("ko-KR") : "0"}</b><span>국내 평가손익(원)</span></div>
+    <div class="stat"><b class="num ${cls(pnlUS)}">${pnlUS ? (pnlUS > 0 ? "+$" : "-$") + Math.abs(pnlUS).toFixed(0) : "$0"}</b><span>미국 평가손익</span></div></div>
+    ${alerts.length ? "" : `<div class="muted" style="margin-top:10px">${hold.length ? "🔵 매도 신호가 뜬 종목이 없습니다." : "보유 탭에서 가진 종목을 입력하면 매일 매도 시점을 점검해 드립니다."}</div>`}</div>`;
+  return html;
+}
+
+function pickRow(p) {
+  const dump = p.dump ? p.dump.split(" ") : null;
+  const dl = dump ? { "높음": "high", "중간": "mid", "낮음": "low" }[dump[0]] : "";
+  return `<div class="item" data-pick="${esc(p.ticker)}">
+    <div class="grow"><div class="name">${p.star ? '<span class="badge b-star">★</span> ' : ""}${esc(p.name)}</div>
+      <div class="tick">${esc(p.ticker)} · ${money(p.close, p.region === "KR")}</div>
+      <div style="margin-top:4px">${p.prob ? `<span class="chip">상승확률 ${esc(p.prob)}</span>` : ""}${dump ? `<span class="chip ${dl}">세력이탈 ${esc(p.dump)}</span>` : ""}</div></div>
+    <div class="right"><div class="num" style="font-weight:800;font-size:17px">${Number(p.vol_ratio).toFixed(1)}배</div>
+      <div class="num muted ${cls(p.ret)}">1개월 ${pct(p.ret)}</div></div></div>`;
+}
+function viewPicks() {
+  const picks = (S.data?.picks || []).filter(p => p.region === S.region);
+  const hits = picks.filter(p => p.kind === "hit"), near = picks.filter(p => p.kind === "near");
+  const st = S.data?.stats?.[S.region];
+  let html = `<div class="seg"><button data-r="KR" class="${S.region === "KR" ? "on" : ""}">🇰🇷 한국</button><button data-r="US" class="${S.region === "US" ? "on" : ""}">🇺🇸 미국</button></div>`;
+  html += `<div class="sec">조건 충족 ${hits.length}종목</div>`;
+  html += hits.length ? `<div class="card list">${hits.map(pickRow).join("")}</div>` : `<div class="card empty">오늘은 조건을 모두 만족한 종목이 없습니다</div>`;
+  if (near.length) html += `<div class="sec">참고: 거래량 3배 미달, 배수 높은 순</div><div class="card list">${near.map(pickRow).join("")}</div>`;
+  if (st) html += `<p class="muted">과거 2년 이 시장의 같은 신호 ${st.n}건: 20거래일 뒤 상승 ${Math.round(st.p_up)}% · +10% 도달 ${Math.round(st.p_hit_up)}% · −10% 하락 ${Math.round(st.p_hit_down)}%</p>`;
+  setTimeout(() => document.querySelectorAll(".seg button").forEach(b => b.onclick = () => { S.region = b.dataset.r; render(); }));
+  return html;
+}
+
+function viewHold() {
+  const hold = holdingsMerged(), closed = S.data?.closed || [];
+  let html = "";
+  if (!LS.get("token")) html += `<div class="card" style="border-color:var(--warn)"><b>매수·매도를 입력하려면 GitHub 토큰이 필요합니다</b><div class="muted" style="margin:4px 0 10px">보기만은 지금도 됩니다. 설정에서 토큰을 넣거나 PC 앱의 QR을 찍으세요.</div><button class="btn ghost" data-goto="settings">설정으로</button></div>`;
+  if (!hold.length) html += `<div class="card empty">아직 입력한 보유 종목이 없습니다.<br>아래 <b>＋ 매수 추가</b>로 가진 종목의 매수일·매수가를 입력하세요.</div>`;
+  else html += `<div class="card list">${hold.map(h => {
+    if (h.pending) return `<div class="item" data-hold="${esc(h.id)}"><div class="grow"><div class="name">${esc(h.name)}</div><div class="tick">${esc(h.ticker)} · 매수 ${esc(h.buy_date)} · ${money(h.buy_price, isKR(h))}</div></div><span class="badge b-wait">⏳ 분석 대기</span></div>`;
+    if (!h.ok) return `<div class="item" data-hold="${esc(h.id || h.ticker)}"><div class="grow"><div class="name">${esc(h.name)}</div><div class="tick">${esc(h.ticker)}</div><div class="muted">⚠️ ${esc(h.error || "시세 오류")}</div></div></div>`;
+    return `<div class="item" data-hold="${esc(h.id || h.ticker)}"><div class="grow"><div class="name">${esc(h.name)}${h.etf ? ' <span class="chip">ETF</span>' : ""}</div>
+      <div class="tick">${money(h.buy_price, isKR(h))} → ${money(h.close, isKR(h))} · ${h.held}거래일</div>
+      <div style="margin-top:4px"><span class="badge ${STATUS_BADGE[h.status]}">${STATUS_ICON[h.status]} ${esc(h.label)}</span>${h.dump_level ? ` <span class="chip ${h.dump_level}">세력이탈 ${DUMP_TXT[h.dump_level]}</span>` : ""}</div></div>
+      <div class="right"><div class="big num ${cls(h.ret)}">${pct(h.ret)}</div><div class="muted num">${h.pnl != null ? (h.pnl > 0 ? "+" : "") + money(h.pnl, isKR(h)) : ""}</div></div></div>`;
+  }).join("")}</div>`;
+  if (closed.length) {
+    const wins = closed.filter(c => c.ret > 0).length, avg = closed.reduce((a, c) => a + (c.ret || 0), 0) / closed.length;
+    html += `<div class="sec">매도 완료 ${closed.length}건 · 이익 ${wins}건 · 평균 ${pct(avg)}</div><div class="card list">` + closed.map(c =>
+      `<div class="item" style="cursor:default"><div class="grow"><div class="name">${esc(c.name)}</div><div class="tick">${esc(c.buy_date)} → ${esc(c.sell_date)} · ${c.days ?? "-"}일</div></div>
+      <div class="right"><div class="num ${cls(c.ret)}" style="font-weight:800">${pct(c.ret)}</div><div class="muted num">${money(c.buy, c.region === "KR")} → ${money(c.sell, c.region === "KR")}</div></div></div>`).join("") + "</div>";
+  }
+  html += `<p class="muted">판단 기준: 손절 −7% · +10%에서 일부 익절 · 이후 최고가 대비 −7% 하락 시 매도 · 매수 전 60일 저점 이탈 · 대량 매도 출현 · 세력 이탈 위험. 평일 07:00·16:10 자동 점검.</p>`;
+  return html;
+}
+
+/* ── 리포트(원본 HTML)를 iframe으로 ── */
+function reportDoc(inner) {
+  const d = S.data || {};
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${d.css || ""}
+  body{margin:0;padding:12px 12px 20px;max-width:none;background:#fff;color:#1d1d1f}
+  .card{margin:12px 0;padding:14px 14px}
+  table:not([class]),table.near,table.closed{display:block;overflow-x:auto;white-space:nowrap}
+  @media(max-width:560px){.lv{grid-template-columns:1fr 1fr!important}.prob .big{font-size:34px}h2{font-size:17px}}
+  </style></head><body>${inner}</body></html>`;
+}
+function frameHTML(inner) { return `<iframe class="rep" sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox" srcdoc="${esc(reportDoc(inner))}"></iframe>`; }
+function fitFrames(root = document) {
+  root.querySelectorAll("iframe.rep").forEach(f => {
+    const fit = () => { try { f.style.height = f.contentDocument.documentElement.scrollHeight + "px"; } catch {} };
+    f.onload = () => {
+      fit(); setTimeout(fit, 300);
+      try {
+        f.contentDocument.addEventListener("click", e => {
+          const a = e.target.closest("a"); if (!a) return;
+          const href = a.getAttribute("href") || "";
+          if (href.startsWith("#")) {
+            e.preventDefault();
+            const el = f.contentDocument.getElementById(decodeURIComponent(href.slice(1)));
+            if (el) { const sc = f.closest(".sheet") || window; const top = el.getBoundingClientRect().top + f.getBoundingClientRect().top;
+              sc === window ? scrollBy({ top: top - 70, behavior: "smooth" }) : sc.scrollBy({ top: top - 40, behavior: "smooth" }); }
+          } else { a.target = "_blank"; a.rel = "noopener"; }
+        });
+      } catch {}
+    };
+  });
+}
+function viewReport() {
+  const d = S.data || {};
+  return `<p class="muted" style="margin:6px 2px">PC 리포트와 같은 내용입니다. 종목명을 누르면 상세 분석으로 이동합니다.</p><div id="repWrap">${frameHTML((d.hold_html || "") + (d.main_html || ""))}</div>`;
+}
+function mountReport() { fitFrames($("#view")); }
+function cardFrom(html, ticker) {
+  const doc = new DOMParser().parseFromString(html || "", "text/html");
+  const el = doc.getElementById("r-" + ticker);
+  return el ? el.outerHTML : null;
+}
+function posFrom(html, ticker) {
+  const doc = new DOMParser().parseFromString(html || "", "text/html");
+  const a = doc.querySelector(`a[href="#r-${CSS.escape(ticker)}"]`);
+  const pos = a && a.closest(".pos");
+  return pos ? pos.outerHTML : null;
+}
+
+/* ── 시트(팝업) ── */
+function sheet(html, onMount) {
+  const bg = document.createElement("div"); bg.className = "sheet-bg";
+  bg.innerHTML = `<div class="sheet"><div class="grab"></div>${html}</div>`;
+  bg.onclick = e => { if (e.target === bg) close(); };
+  function close() { bg.remove(); document.body.style.overflow = ""; }
+  document.body.appendChild(bg); document.body.style.overflow = "hidden";
+  bg.querySelectorAll("[data-close]").forEach(b => b.onclick = close);
+  fitFrames(bg);
+  onMount && onMount(bg, close);
+  return close;
+}
+function openPick(ticker) {
+  const p = (S.data?.picks || []).find(x => x.ticker === ticker); if (!p) return;
+  const card = cardFrom(S.data.main_html, ticker);
+  const code = ticker.split(".")[0];
+  const link = p.region === "KR" ? `https://finance.naver.com/item/main.naver?code=${code}` : `https://finance.yahoo.com/quote/${ticker}`;
+  sheet(`<div class="row"><div class="grow"><h2>${p.star ? "★ " : ""}${esc(p.name)}</h2><div class="tick">${esc(ticker)} · ${esc(p.market)}</div></div><button class="iconbtn" data-close>✕</button></div>
+    <div class="levels"><div><span>종가</span><b>${money(p.close, p.region === "KR")}</b></div><div><span>1개월 수익률</span><b class="${cls(p.ret)}">${pct(p.ret)}</b></div>
+    <div><span>거래량 배수</span><b>${Number(p.vol_ratio).toFixed(1)}배</b></div><div><span>상승 확률</span><b>${esc(p.prob || "-")}</b></div></div>
+    <div style="margin:12px 0">${card ? frameHTML(card) : `<div class="card muted">이 종목은 상세 분석 대상이 아닙니다 (참고 목록 하위). <a href="${link}" target="_blank" rel="noopener">시세 보기 ›</a></div>`}</div>
+    ${LS.get("token") ? `<button class="btn full ghost" id="buyThis">＋ 이 종목 매수 기록하기</button>` : ""}`,
+    (bg, close) => { const b = bg.querySelector("#buyThis"); if (b) b.onclick = () => { close(); openTradeForm({ code: code, name: p.name, buy_price: p.close }); }; });
+}
+function openHolding(id) {
+  const h = holdingsMerged().find(x => (x.id || x.ticker) === id);
+  if (!h) return;
+  const t = S.trades?.find(x => x.id === h.id);
+  const card = h.ticker ? cardFrom(S.data?.hold_html, h.ticker) : null;
+  const pos = h.ticker ? posFrom(S.data?.hold_html, h.ticker) : null;
+  const kr = isKR(h);
+  let body = `<div class="row"><div class="grow"><h2>${esc(h.name)}</h2><div class="tick">${esc(h.ticker)} · 매수 ${esc(h.buy_date)} · ${money(h.buy_price, kr)}${h.qty ? ` · ${esc(h.qty)}주` : ""}</div></div><button class="iconbtn" data-close>✕</button></div>`;
+  if (h.pending) body += `<div class="card"><b>⏳ 분석 대기 중</b><div class="muted">저장 후 1~3분 안에 클라우드에서 분석합니다. 잠시 뒤 새로고침하세요.</div></div>`;
+  else if (h.ok) {
+    body += `<div class="card"><div class="row"><div class="grow"><div class="big num ${cls(h.ret)}">${pct(h.ret)}</div><div class="muted">현재 ${money(h.close, kr)} (${esc(h.last_date)} 종가)${h.pnl != null ? " · " + (h.pnl > 0 ? "+" : "") + money(h.pnl, kr) : ""}</div></div></div>
+      <div style="margin-top:8px"><span class="badge ${STATUS_BADGE[h.status]}" style="font-size:15px;white-space:normal">${STATUS_ICON[h.status]} ${esc(h.label)}</span></div>
+      <ul class="reasons">${(h.reasons || []).map(r => `<li>${esc(r)}</li>`).join("")}</ul>
+      <div class="levels"><div><span>손절가 (−7%)</span><b>${money(h.stop, kr)}</b></div><div><span>1차 목표 (+10%)</span><b>${money(h.target, kr)}</b></div>
+      <div><span>추적 손절가</span><b>${h.trail ? money(h.trail, kr) : "목표 도달 후"}</b></div><div><span>지지선</span><b>${money(h.support, kr)}</b></div></div>
+      ${h.best ? `<div class="muted" style="margin-top:8px">보유 ${h.held}거래일 / 과거 기준 유리했던 보유 기간 ${h.best}거래일</div>` : ""}</div>`;
+    if (card) body += `<div class="sec">상세 분석</div>${frameHTML(card)}`;
+  } else body += `<div class="card">⚠️ ${esc(h.error || "")}</div>`;
+  if (t) body += `<div class="two" style="margin-top:14px"><button class="btn" id="sellBtn">매도 기록</button><button class="btn ghost" id="editBtn">수정</button></div>
+    <button class="btn full danger" id="delBtn" style="margin-top:10px">기록 삭제</button>`;
+  else if (LS.get("token") && !S.tradesLoaded) body += `<p class="muted">기록을 불러오는 중이거나 토큰 확인이 필요합니다.</p>`;
+  sheet(body, (bg, close) => {
+    if (!t) return;
+    bg.querySelector("#sellBtn").onclick = () => { close(); openSellForm(t, h); };
+    bg.querySelector("#editBtn").onclick = () => { close(); openTradeForm(t); };
+    bg.querySelector("#delBtn").onclick = async () => {
+      if (!confirm(`${t.name || t.code} 기록을 삭제할까요?`)) return;
+      close(); await saveTrades(S.trades.filter(x => x.id !== t.id), "기록 삭제");
+    };
+  });
+}
+
+/* ── 매수 / 매도 입력 ── */
+function openTradeForm(t = {}) {
+  const editing = !!t.id;
+  sheet(`<div class="row"><h2 class="grow">${editing ? "기록 수정" : "매수 기록 추가"}</h2><button class="iconbtn" data-close>✕</button></div>
+    <label class="f"><span>종목코드</span><input class="in" id="fCode" value="${esc(t.code || "")}" placeholder="005930 / 0190C0 / AAPL" autocapitalize="characters" autocomplete="off"></label>
+    <label class="f"><span>종목명 (비워도 됨)</span><input class="in" id="fName" value="${esc(t.name || "")}" placeholder="삼성전자"></label>
+    <div class="two"><label class="f"><span>매수일</span><input class="in" id="fDate" type="date" value="${esc(t.buy_date || today())}"></label>
+    <label class="f"><span>매수가 (1주)</span><input class="in" id="fPrice" inputmode="decimal" value="${esc(t.buy_price || "")}" placeholder="58000 / 12.5"></label></div>
+    <div class="two"><label class="f"><span>수량 (선택)</span><input class="in" id="fQty" inputmode="numeric" value="${esc(t.qty || "")}"></label>
+    <label class="f"><span>메모 (선택)</span><input class="in" id="fMemo" value="${esc(t.memo || "")}"></label></div>
+    <p class="muted">나눠서 샀다면 평균 단가로 한 번 입력하세요. 저장하면 1~3분 안에 분석이 반영됩니다.</p>
+    <button class="btn full" id="fSave">저장</button>`, (bg, close) => {
+    bg.querySelector("#fSave").onclick = async () => {
+      let code = bg.querySelector("#fCode").value.trim().toUpperCase();
+      if (/^\d{1,5}$/.test(code)) code = code.padStart(6, "0");
+      const price = parseFloat(bg.querySelector("#fPrice").value.replace(/[,원$\s]/g, ""));
+      const date = bg.querySelector("#fDate").value;
+      if (!code) return toast("종목코드를 입력하세요");
+      if (!(price > 0)) return toast("매수가를 숫자로 입력하세요");
+      if (!date) return toast("매수일을 입력하세요");
+      const rec = Object.assign({}, t, { id: t.id || uid(), code, name: bg.querySelector("#fName").value.trim(), buy_date: date,
+        buy_price: String(price), qty: bg.querySelector("#fQty").value.replace(/[^\d.]/g, ""), memo: bg.querySelector("#fMemo").value.trim(),
+        sell_date: t.sell_date || "", sell_price: t.sell_price || "" });
+      const list = (S.trades || []).filter(x => x.id !== rec.id).concat([rec]);
+      close(); await saveTrades(list, editing ? "기록 수정" : "매수 추가");
+    };
+  });
+}
+function openSellForm(t, h) {
+  sheet(`<div class="row"><h2 class="grow">매도 기록 — ${esc(t.name || t.code)}</h2><button class="iconbtn" data-close>✕</button></div>
+    <div class="two"><label class="f"><span>매도일</span><input class="in" id="sDate" type="date" value="${today()}"></label>
+    <label class="f"><span>매도가</span><input class="in" id="sPrice" inputmode="decimal" value="${h && h.close ? (isKR(h) ? Math.round(h.close) : h.close.toFixed(2)) : ""}"></label></div>
+    <p class="muted">매도 기록을 하면 보유 점검에서 빠지고 '매도 완료'에 수익률과 함께 남습니다.</p>
+    <button class="btn full" id="sSave">저장</button>`, (bg, close) => {
+    bg.querySelector("#sSave").onclick = async () => {
+      const price = parseFloat(bg.querySelector("#sPrice").value.replace(/[,원$\s]/g, ""));
+      if (!(price > 0)) return toast("매도가를 숫자로 입력하세요");
+      const list = S.trades.map(x => x.id === t.id ? Object.assign({}, x, { sell_date: bg.querySelector("#sDate").value, sell_price: String(price) }) : x);
+      close(); await saveTrades(list, "매도 기록");
+    };
+  });
+}
+async function saveTrades(list, msg) {
+  if (!LS.get("token")) return toast("설정에서 GitHub 토큰을 먼저 넣어주세요");
+  try {
+    toast("저장 중…", 1500);
+    await putRepoFile("trades.enc", await encryptObj({ trades: list, updated: new Date().toISOString() }, S.pw), "앱: " + msg);
+    S.trades = list; S.tradesLoaded = true; render();
+    toast("저장했습니다. 1~3분 뒤 분석이 반영됩니다", 3500);
+    setTimeout(() => checkRun(true), 8000);
+  } catch (e) { toast(e.message, 4000); }
+}
+
+/* ── 실행 상태 ── */
+let runTimer = null;
+async function checkRun(follow = false) {
+  if (!LS.get("token")) return;
+  const run = await latestRun().catch(() => null);
+  const wasRunning = S.running;
+  S.running = !!run && run.status !== "completed";
+  S.lastRun = run;
+  if (S.tab === "settings" || wasRunning !== S.running) render();
+  if (S.running || follow) { clearTimeout(runTimer); runTimer = setTimeout(() => checkRun(), 20000); }
+  if (wasRunning && !S.running) { await refresh(true); toast(run.conclusion === "success" ? "✅ 분석이 끝났습니다" : "⚠️ 분석이 실패했습니다. 설정에서 확인하세요", 4000); }
+}
+
+/* ── 설정 ── */
+function viewSettings() {
+  const { owner, repo } = repoInfo(), token = LS.get("token");
+  const run = S.lastRun;
+  const pushOK = "PushManager" in window && "serviceWorker" in navigator;
+  const standalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone;
+  const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  return `
+  <div class="sec">분석 실행</div><div class="card">
+    <div class="kv"><span>마지막 전체 분석</span><b>${fmtTime(S.data?.screened_at)}</b></div>
+    <div class="kv"><span>마지막 보유 점검</span><b>${fmtTime(S.data?.generated_at)}</b></div>
+    <div class="kv"><span>클라우드 실행 상태</span><b>${!token ? "토큰 필요" : run ? (run.status !== "completed" ? "⏳ 실행 중" : run.conclusion === "success" ? "✅ 성공" : "⚠️ " + run.conclusion) + " · " + fmtTime(run.created_at) : "-"}</b></div>
+    <div class="two" style="margin-top:12px"><button class="btn" id="runFull" ${token ? "" : "disabled"}>지금 전체 분석</button><button class="btn ghost" id="runHold" ${token ? "" : "disabled"}>보유만 점검</button></div>
+    <p class="muted">자동 실행: 평일 07:00 전체 분석 · 16:10 보유 종목 점검. 전체 분석은 5~10분 걸립니다.</p>
+    ${run ? `<a href="${run.html_url}" target="_blank" rel="noopener" class="muted">실행 기록 보기 ›</a>` : ""}</div>
+
+  <div class="sec">알림</div><div class="card">
+    ${!pushOK ? (ios && !standalone ? `<b>아이폰은 홈 화면에 추가한 앱에서만 알림이 됩니다.</b><div class="muted">아래 '앱 설치'대로 홈 화면에 추가한 뒤, 그 아이콘으로 열어서 알림을 켜세요.</div>` : `<div class="muted">이 브라우저는 알림을 지원하지 않습니다.</div>`)
+      : `<div class="muted" style="margin-bottom:10px">매일 아침 분석 결과와 보유 종목 매도 신호를 알려드립니다. (현재: ${Notification.permission === "granted" ? "허용됨" : Notification.permission === "denied" ? "차단됨 — 폰 설정에서 허용해 주세요" : "꺼짐"})</div>
+      <button class="btn full" id="pushBtn" ${token ? "" : "disabled"}>🔔 이 기기에서 알림 켜기</button>`}</div>
+
+  <div class="sec">GitHub 연결</div><div class="card">
+    <label class="f"><span>저장소</span><div class="two"><input class="in" id="sOwner" value="${esc(owner)}" placeholder="아이디"><input class="in" id="sRepo" value="${esc(repo)}" placeholder="stock-app"></div></label>
+    <label class="f"><span>GitHub 토큰 (매수·매도 입력, 지금 분석, 알림에 필요)</span><input class="in" id="sToken" type="password" value="${esc(token || "")}" placeholder="github_pat_..."></label>
+    <button class="btn full" id="saveConn">저장</button>
+    <details style="margin-top:12px"><summary class="muted">토큰 만드는 법</summary><ol class="steps">
+      <li><a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">github.com/settings/personal-access-tokens/new</a> 열기 (PC 권장)</li>
+      <li>Token name: <code>stock-app</code>, Expiration: <b>366 days</b></li>
+      <li>Repository access: <b>Only select repositories</b> → <code>${esc(repo || "stock-app")}</code></li>
+      <li>Permissions → Repository permissions: <b>Contents</b> = Read and write, <b>Actions</b> = Read and write</li>
+      <li><b>Generate token</b> → 나온 값을 복사해서 위 칸에 붙여넣기</li></ol></details>
+    ${token ? `<button class="btn full ghost" id="qrBtn" style="margin-top:10px">📱 폰으로 연결 옮기기 (QR)</button><div id="qr"></div>` : ""}</div>
+
+  <div class="sec">기존 기록 가져오기</div><div class="card">
+    <div class="muted" style="margin-bottom:8px">PC에서 쓰던 <code>my_trades.csv</code> 파일을 선택하거나 내용을 붙여넣으세요.</div>
+    <input type="file" id="csvFile" accept=".csv,text/csv" class="in" ${token ? "" : "disabled"}>
+    <textarea class="in" id="csvText" rows="3" placeholder="종목코드,종목명,매수일,매수가,수량,매도일,매도가,메모" style="margin-top:8px" ${token ? "" : "disabled"}></textarea>
+    <button class="btn full ghost" id="csvBtn" style="margin-top:8px" ${token ? "" : "disabled"}>가져오기</button></div>
+
+  <div class="sec">앱 설치 (홈 화면에 추가)</div><div class="card"><ol class="steps">
+    <li><b>아이폰</b>: Safari로 이 주소 열기 → 아래 공유 버튼 <b>⎋</b> → <b>홈 화면에 추가</b></li>
+    <li><b>안드로이드</b>: Chrome으로 열기 → 오른쪽 위 <b>⋮</b> → <b>홈 화면에 추가</b> (또는 '앱 설치')</li></ol>
+    <div class="muted">설치 상태: ${standalone ? "✅ 앱으로 실행 중" : "브라우저로 보는 중"}</div></div>
+
+  <div class="sec">보안</div><div class="card">
+    <button class="btn full ghost" id="lockBtn">잠그기 (이 기기에서 비밀번호 지우기)</button>
+    <p class="muted">데이터는 앱 비밀번호로 암호화돼 저장됩니다. 비밀번호를 바꾸려면 GitHub의 APP_PASSWORD를 바꾼 뒤 '지금 전체 분석'을 실행하고, 매수 기록은 다시 가져오기 하세요.</p></div>`;
+}
+function bindSettings() {
+  const on = (id, f) => { const el = $(id); if (el) el.onclick = f; };
+  on("#saveConn", () => {
+    LS.set("owner", $("#sOwner").value.trim() || null); LS.set("repo", $("#sRepo").value.trim() || null);
+    LS.set("token", $("#sToken").value.trim() || null);
+    toast("저장했습니다"); refresh(true);
+  });
+  on("#runFull", async () => { try { await dispatch("full"); toast("전체 분석을 시작했습니다 (5~10분)", 3500); S.running = true; render(); setTimeout(() => checkRun(true), 10000); } catch (e) { toast(e.message, 4000); } });
+  on("#runHold", async () => { try { await dispatch("holdings"); toast("보유 종목 점검을 시작했습니다 (1~3분)", 3500); S.running = true; render(); setTimeout(() => checkRun(true), 10000); } catch (e) { toast(e.message, 4000); } });
+  on("#lockBtn", () => { LS.set("pw", null); LS.set("cache", null); location.reload(); });
+  on("#pushBtn", enablePush);
+  on("#qrBtn", showQR);
+  on("#csvBtn", importCSV);
+}
+async function showQR() {
+  const { owner, repo } = repoInfo();
+  const payload = btoa(unescape(encodeURIComponent(JSON.stringify({ token: LS.get("token"), owner, repo }))));
+  const url = `https://${owner}.github.io/${repo}/#setup=${encodeURIComponent(payload)}`;
+  if (!window.QRCode) await new Promise((ok, no) => { const s = document.createElement("script"); s.src = "https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
+  $("#qr").innerHTML = ""; new QRCode($("#qr"), { text: url, width: 220, height: 220, correctLevel: QRCode.CorrectLevel.L });
+  $("#qr").insertAdjacentHTML("beforeend", `<p class="muted" style="text-align:center">폰 카메라로 찍으면 앱이 열리면서 GitHub 연결이 자동으로 입력됩니다. 비밀번호는 폰에서 한 번 입력하세요.<br>⚠️ 이 QR은 다른 사람에게 보여주지 마세요.</p>`);
+}
+function parseCSV(text) {
+  const rows = text.replace(/^﻿/, "").split(/\r?\n/).map(l => l.split(",").map(s => s.trim())).filter(r => r.some(Boolean));
+  if (!rows.length) return [];
+  const head = rows[0][0].includes("종목") ? rows.shift() : null;
+  return rows.map(r => {
+    let code = (r[0] || "").toUpperCase(); if (/^\d{1,5}$/.test(code)) code = code.padStart(6, "0");
+    return { id: uid(), code, name: r[1] || "", buy_date: (r[2] || "").replace(/[./]/g, "-"), buy_price: (r[3] || "").replace(/[,원$]/g, ""),
+      qty: r[4] || "", sell_date: (r[5] || "").replace(/[./]/g, "-"), sell_price: (r[6] || "").replace(/[,원$]/g, ""), memo: r.slice(7).join(",") };
+  }).filter(t => t.code && parseFloat(t.buy_price) > 0);
+}
+async function importCSV() {
+  let text = $("#csvText").value;
+  const f = $("#csvFile").files[0];
+  if (f) { const buf = await f.arrayBuffer(); text = new TextDecoder("utf-8").decode(buf); if (text.includes("�")) text = new TextDecoder("euc-kr").decode(buf); }
+  const items = parseCSV(text);
+  if (!items.length) return toast("가져올 기록을 찾지 못했습니다");
+  const exist = new Set((S.trades || []).map(t => [t.code, t.buy_date, t.buy_price].join("|")));
+  const add = items.filter(t => !exist.has([t.code, t.buy_date, t.buy_price].join("|")));
+  if (!confirm(`${add.length}건을 추가할까요? (중복 ${items.length - add.length}건 제외)`)) return;
+  await saveTrades((S.trades || []).concat(add), `기록 ${add.length}건 가져오기`);
+}
+async function enablePush() {
+  try {
+    const perm = await Notification.requestPermission();
+    if (perm !== "granted") return toast("알림이 허용되지 않았습니다");
+    const reg = await navigator.serviceWorker.ready;
+    const pj = await (await fetch("push.json?t=" + Date.now(), { cache: "no-store" })).json();
+    const key = Uint8Array.from(atob(pj.publicKey.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((pj.publicKey.length + 3) % 4)), c => c.charCodeAt(0));
+    let sub = await reg.pushManager.getSubscription();
+    if (sub) { const cur = sub.options?.applicationServerKey; if (cur && b64e(cur) !== b64e(key)) { await sub.unsubscribe(); sub = null; } }
+    if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
+    let subs = [];
+    const old = await fetchRepoFile("subs.enc").catch(() => null);
+    if (old) { try { subs = (await decryptText(old, S.pw)).subs || []; } catch {} }
+    const js = sub.toJSON();
+    subs = subs.filter(s => s.endpoint !== js.endpoint).concat([js]);
+    await putRepoFile("subs.enc", await encryptObj({ subs }, S.pw), "앱: 알림 기기 등록");
+    toast("알림을 켰습니다. 1~3분 안에 테스트 알림이 옵니다", 4000);
+  } catch (e) { toast("알림 켜기 실패: " + e.message, 4500); }
+}
+
+/* ───────────── 이벤트 ───────────── */
+document.querySelectorAll("nav.tabs button").forEach(b => b.onclick = () => { S.tab = b.dataset.tab; render(); scrollTo(0, 0); if (S.tab === "settings") checkRun(); });
+$("#refreshBtn").onclick = () => refresh(false);
+$("#fab").onclick = () => { if (!LS.get("token")) { toast("설정에서 GitHub 토큰을 먼저 넣어주세요"); return; } openTradeForm(); };
+$("#unlockBtn").onclick = () => unlock($("#pw").value, $("#remember").checked);
+$("#pw").addEventListener("keydown", e => { if (e.key === "Enter") $("#unlockBtn").click(); });
+document.addEventListener("visibilitychange", () => { if (!document.hidden && S.pw) refresh(true); });
+if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(() => {}); navigator.serviceWorker.addEventListener("message", e => { if (e.data === "refresh" && S.pw) refresh(true); }); }
+const tabParam = new URLSearchParams(location.search).get("tab"); if (tabParam && TITLES[tabParam]) S.tab = tabParam;
+
+(function start() {
+  const pw = LS.get("pw");
+  if (pw) unlock(pw, true); else $("#lock").classList.remove("hidden");
+  if (window.__setupImported) setTimeout(() => toast("GitHub 연결 정보를 받았습니다. 비밀번호를 입력하세요", 4000), 300);
+})();
+</script>
+</body>
+</html>
