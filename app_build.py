@@ -5,13 +5,18 @@
   python app_build.py --mode holdings   보유 종목만 다시 점검 (앱에서 매수·매도 입력 시, 평일 16:10)
 
 필요한 환경변수: APP_PASSWORD (앱 비밀번호), DART_API_KEY (선택)
+              DATA_DIR (데이터를 둘 폴더 = data 브랜치를 받은 곳. 기본: 이 폴더)
+              TEST_PUSH=true (알림 테스트 보내기)
+
+코드는 main 브랜치, 앱 화면+암호화 데이터는 data 브랜치(GitHub Pages)에 둡니다.
+그래서 이 저장소를 템플릿으로 복사해도 데이터는 따라가지 않습니다.
 """
 from __future__ import annotations
 
 import argparse
 import json
 import os
-import subprocess
+import shutil
 import sys
 import tempfile
 from datetime import datetime, timedelta, timezone
@@ -24,10 +29,10 @@ import cloud_push as P
 import config as C
 
 BASE = Path(__file__).parent
-DOCS = BASE / "docs"
-DATA_FILE = DOCS / "data.enc"
-STATUS_FILE = DOCS / "status.json"
-TRADES_ENC = BASE / "trades.enc"
+SITE = Path(os.environ.get("DATA_DIR") or BASE).resolve()
+DATA_FILE = SITE / "data.enc"
+STATUS_FILE = SITE / "status.json"
+TRADES_ENC = SITE / "trades.enc"
 KST = timezone(timedelta(hours=9))
 STATUS_ORDER = {"sell": 0, "warn": 1, "take": 2, "hold": 3}
 
@@ -61,7 +66,11 @@ def _clean(v):
 def load_app_trades(pw: str) -> list[dict]:
     if not TRADES_ENC.exists():
         return []
-    return X.decrypt_obj(TRADES_ENC.read_text(), pw).get("trades", [])
+    try:
+        return X.decrypt_obj(TRADES_ENC.read_text(), pw).get("trades", [])
+    except Exception as e:
+        log(f"매매 기록을 풀 수 없음 (앱 비밀번호가 GitHub의 APP_PASSWORD와 다름?): {e}")
+        return []
 
 
 def trades_to_csv(trades: list[dict]) -> Path:
@@ -137,19 +146,34 @@ def load_previous(pw: str) -> dict:
 
 
 def save(data: dict, pw: str) -> None:
-    DOCS.mkdir(exist_ok=True)
+    SITE.mkdir(parents=True, exist_ok=True)
     DATA_FILE.write_text(X.encrypt_obj(data, pw))
     STATUS_FILE.write_text(json.dumps({"updated": data["generated_at"], "mode": data["mode"],
                                        "run_date": data.get("run_date")}))
     log(f"저장: {DATA_FILE} ({DATA_FILE.stat().st_size // 1024}KB, 암호화)")
 
 
-def changed_files() -> list[str]:
-    try:
-        out = subprocess.run(["git", "diff", "--name-only", "HEAD~1", "HEAD"], capture_output=True, text=True, cwd=BASE)
-        return out.stdout.split()
-    except Exception:
-        return []
+def setup_paths() -> None:
+    """알림 키·구독·캐시를 데이터 폴더(SITE)로"""
+    import evidence as E
+    import trades as TR
+    P.PUB_FILE, P.PRIV_FILE, P.SUBS_FILE = SITE / "push.json", SITE / "vapid.enc", SITE / "subs.enc"
+    TR.CACHE = E.CACHE = SITE / "cache"
+
+
+def migrate_old() -> None:
+    """예전 방식(main 브랜치에 데이터)으로 쌓인 파일을 data 브랜치 쪽으로 한 번 옮김"""
+    if SITE == BASE.resolve():
+        return
+    pairs = [("docs/data.enc", "data.enc"), ("docs/push.json", "push.json"), ("docs/status.json", "status.json"),
+             ("vapid.enc", "vapid.enc"), ("trades.enc", "trades.enc"), ("subs.enc", "subs.enc")]
+    for src, dst in pairs:
+        if (BASE / src).exists() and not (SITE / dst).exists():
+            SITE.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(BASE / src, SITE / dst)
+            log(f"이전: {src} → data 브랜치/{dst}")
+    if (BASE / "cache").is_dir() and not (SITE / "cache").exists():
+        shutil.copytree(BASE / "cache", SITE / "cache")
 
 
 def holding_alerts(hold: list[dict]) -> list[str]:
@@ -175,6 +199,8 @@ def main() -> int:
     import trades as TR
     from trades import HOLD_CSS
 
+    migrate_old()
+    setup_paths()
     P.ensure_keys(pw)
     prev = load_previous(pw)
     mode = args.mode
@@ -204,10 +230,9 @@ def main() -> int:
 
     # ── 알림 ──
     event = os.environ.get("GITHUB_EVENT_NAME", "")
-    changed = changed_files() if event == "push" else []
     alerts = holding_alerts(h["holdings"])
     try:
-        if "subs.enc" in changed:
+        if os.environ.get("TEST_PUSH", "").lower() == "true":
             P.send_all(pw, "🔔 알림이 연결됐습니다", "매일 아침 분석 결과와 보유 종목 매도 신호를 이 기기로 알려드립니다.")
         elif mode == "full":
             stars = [p["name"] for p in data["picks"] if p["star"]]

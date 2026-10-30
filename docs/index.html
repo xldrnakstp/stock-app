@@ -185,32 +185,31 @@ function gh(path, opt = {}) {
   if (token) headers.Authorization = "Bearer " + token;
   return fetch(`https://api.github.com/repos/${owner}/${repo}${path}`, Object.assign({}, opt, { headers, cache: "no-store" }));
 }
+const DATA_BRANCH = "data";   // 앱 화면 + 암호화 데이터가 있는 브랜치 (GitHub Pages)
 async function fetchRepoFile(path, asText = true) {
-  // 토큰이 있으면 API(즉시 최신), 없으면 공개 주소
+  // 토큰이 있으면 API(즉시 최신), 없으면 이 앱과 같은 곳(Pages)에서
   if (LS.get("token") && repoInfo().owner) {
-    const r = await gh(`/contents/${path}?t=${Date.now()}`, { headers: { Accept: "application/vnd.github.raw" } });
+    const r = await gh(`/contents/${path}?ref=${DATA_BRANCH}&t=${Date.now()}`, { headers: { Accept: "application/vnd.github.raw" } });
     if (r.status === 404) return null;
-    if (!r.ok) throw new Error("GitHub " + r.status);
+    if (!r.ok) throw new Error(r.status === 401 ? "GitHub 토큰이 잘못됐거나 만료됐습니다 (설정에서 확인)" : "GitHub " + r.status);
     return asText ? r.text() : r;
   }
-  const local = path.startsWith("docs/") ? path.slice(5) : null;
-  const { owner, repo } = repoInfo();
-  const url = local ? `${local}?t=${Date.now()}` : `https://raw.githubusercontent.com/${owner}/${repo}/main/${path}?t=${Date.now()}`;
-  const r = await fetch(url, { cache: "no-store" });
+  const r = await fetch(`${path}?t=${Date.now()}`, { cache: "no-store" });
   if (r.status === 404) return null;
   if (!r.ok) throw new Error("파일을 받을 수 없음 " + r.status);
   return r.text();
 }
 async function putRepoFile(path, text, message) {
   let sha;
-  const g = await gh(`/contents/${path}`);
+  const g = await gh(`/contents/${path}?ref=${DATA_BRANCH}`);
   if (g.ok) sha = (await g.json()).sha;
   else if (g.status !== 404) throw new Error(g.status === 401 ? "토큰이 잘못됐거나 만료됐습니다" : "GitHub 오류 " + g.status);
-  const r = await gh(`/contents/${path}`, { method: "PUT", body: JSON.stringify({ message, content: btoa(text), sha }) });
+  const r = await gh(`/contents/${path}`, { method: "PUT", body: JSON.stringify({ message, content: btoa(text), sha, branch: DATA_BRANCH }) });
   if (!r.ok) throw new Error(r.status === 403 || r.status === 404 ? "토큰 권한 부족 (Contents: Read and write 필요)" : "저장 실패 " + r.status);
 }
-async function dispatch(mode = "full") {
-  const r = await gh(`/actions/workflows/app.yml/dispatches`, { method: "POST", body: JSON.stringify({ ref: "main", inputs: { mode } }) });
+async function dispatch(mode = "full", testPush = false) {
+  const r = await gh(`/actions/workflows/app.yml/dispatches`, { method: "POST",
+    body: JSON.stringify({ ref: "main", inputs: { mode, test_push: testPush ? "true" : "false" } }) });
   if (!r.ok) throw new Error(r.status === 403 || r.status === 404 ? "토큰 권한 부족 (Actions: Read and write 필요)" : "실행 요청 실패 " + r.status);
 }
 async function latestRun() {
@@ -237,7 +236,7 @@ function today() { const d = new Date(); return new Date(d - d.getTimezoneOffset
 
 /* ───────────── 시작 / 잠금 ───────────── */
 async function loadData(showErr = true) {
-  const text = await fetchRepoFile("docs/data.enc");
+  const text = await fetchRepoFile("data.enc");
   if (!text) throw new Error("아직 분석 데이터가 없습니다. 첫 분석이 끝날 때까지 기다리거나 설정에서 '지금 분석'을 누르세요.");
   const data = await decryptText(text, S.pw);
   S.data = data; LS.set("cache", text);
@@ -538,7 +537,8 @@ async function saveTrades(list, msg) {
     toast("저장 중…", 1500);
     await putRepoFile("trades.enc", await encryptObj({ trades: list, updated: new Date().toISOString() }, S.pw), "앱: " + msg);
     S.trades = list; S.tradesLoaded = true; render();
-    toast("저장했습니다. 1~3분 뒤 분석이 반영됩니다", 3500);
+    try { await dispatch("holdings"); S.running = true; render(); toast("저장했습니다. 1~3분 뒤 분석이 반영됩니다", 3500); }
+    catch (e) { toast("저장은 됐지만 분석 요청 실패: " + e.message + " (다음 자동 점검 때 반영)", 5000); }
     setTimeout(() => checkRun(true), 8000);
   } catch (e) { toast(e.message, 4000); }
 }
@@ -663,6 +663,7 @@ async function enablePush() {
     const js = sub.toJSON();
     subs = subs.filter(s => s.endpoint !== js.endpoint).concat([js]);
     await putRepoFile("subs.enc", await encryptObj({ subs }, S.pw), "앱: 알림 기기 등록");
+    await dispatch("holdings", true);
     toast("알림을 켰습니다. 1~3분 안에 테스트 알림이 옵니다", 4000);
   } catch (e) { toast("알림 켜기 실패: " + e.message, 4500); }
 }
