@@ -4,15 +4,17 @@ on:
   schedule:
     - cron: "0 22 * * 0-4"   # 한국시간 평일 07:00 — 전체 분석 (미국장 마감 반영)
     - cron: "10 7 * * 1-5"   # 한국시간 평일 16:10 — 보유 종목 점검 (한국장 마감 반영)
-  workflow_dispatch:          # 앱의 '지금 분석' 버튼 / Actions 탭에서 수동 실행
+  workflow_dispatch:          # 앱의 '지금 분석'·매수 입력·알림 켜기, 또는 Actions 탭에서 수동 실행
     inputs:
       mode:
         description: "full = 전체 분석, holdings = 보유 종목만"
         type: choice
         options: [full, holdings]
         default: full
-  push:
-    paths: ["trades.enc", "subs.enc"]   # 앱에서 매수·매도 입력, 알림 켜기
+      test_push:
+        description: "알림 테스트 보내기"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -21,14 +23,23 @@ concurrency:
   group: stock-app
   cancel-in-progress: false
 
+# 코드는 main 브랜치, 앱 화면 + 암호화된 데이터는 data 브랜치(GitHub Pages가 이걸 보여줌)
 jobs:
   run:
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    env:
+      REPO_URL: https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
+
+      - name: Get data branch
+        run: |
+          if git ls-remote --exit-code --heads "$REPO_URL" data >/dev/null 2>&1; then
+            git clone -q --depth 1 --branch data "$REPO_URL" site
+          else
+            mkdir site && git -C site init -q -b data && git -C site remote add origin "$REPO_URL"
+          fi
 
       - uses: actions/setup-python@v5
         with:
@@ -41,15 +52,31 @@ jobs:
         env:
           APP_PASSWORD: ${{ secrets.APP_PASSWORD }}
           DART_API_KEY: ${{ secrets.DART_API_KEY }}
+          DATA_DIR: site
+          TEST_PUSH: ${{ inputs.test_push }}
           MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.mode || (github.event_name == 'schedule' && github.event.schedule == '0 22 * * 0-4') && 'full' || 'holdings' }}
         run: python app_build.py --mode "$MODE"
 
-      - name: Save (encrypted)
+      - name: Publish app + encrypted data (data branch)
+        run: |
+          cp -r docs/. site/
+          touch site/.nojekyll
+          cd site
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet && exit 0
+          git commit -q -m "앱 데이터 업데이트 $(TZ=Asia/Seoul date '+%F %H:%M')"
+          for i in 1 2 3; do
+            git push -q origin HEAD:data && break
+            git pull -q --rebase origin data; sleep 3
+          done
+
+      - name: Remove old data files from main (one-time cleanup)
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -A -- docs cache vapid.enc
-          git add -A -- subs.enc 2>/dev/null || true
+          git rm -q -r --ignore-unmatch docs/data.enc docs/push.json docs/status.json vapid.enc trades.enc subs.enc cache
           git diff --cached --quiet && exit 0
-          git commit -m "앱 데이터 업데이트 $(TZ=Asia/Seoul date '+%F %H:%M')"
-          for i in 1 2 3; do git pull --rebase -X theirs && git push && break; sleep 5; done
+          git commit -q -m "데이터 파일을 data 브랜치로 이전"
+          git push -q origin HEAD:main || true
