@@ -1,0 +1,16 @@
+{
+  "name": "주식 레이더",
+  "short_name": "주식 레이더",
+  "description": "거래량 급증·주가 정체 종목과 내 보유 종목 매도 시점을 매일 분석",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "lang": "ko",
+  "icons": [
+    {"src": "icon-192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png"},
+    {"src": "icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ]
+}
